@@ -85,5 +85,5 @@ class Feedback(Resource):
         
         return {'message': 'Feedback received and model updated'}
 
-if __name__ == '__main__':
-    app.run(debug=True)
+# if __name__ == '__main__':
+#     app.run(debug=True)
