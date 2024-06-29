@@ -1,2 +1,6 @@
 Flask
+flask-restx
+nltk
+scikit-learn
+flask-cors
 Gunicorn
