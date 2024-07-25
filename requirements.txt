@@ -3,4 +3,6 @@ flask-restx
 nltk
 scikit-learn
 flask-cors
+torch
+transformers
 Gunicorn
