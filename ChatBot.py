@@ -1,23 +1,24 @@
 from flask import Flask, request
 from flask_restx import Api, Resource, fields
 from flask_cors import CORS
-from transformers import GPT2LMHeadModel, GPT2Tokenizer
-import torch
+from huggingface_hub import InferenceClient
+import os
 from typing import List, Tuple
 
 app = Flask(__name__)
 CORS(app)
 api = Api(app, version='1.0', title='Enhanced Chatbot API',
-    description='An advanced chatbot API using GPT-2 with a feedback mechanism')
+    description='An advanced chatbot API using Hugging Face InferenceClient (Cerebras) with feedback mechanism')
 
 ns = api.namespace('chatbot', description='Chatbot operations')
 
-# Initialize the GPT-2 model and tokenizer
-model_name = "gpt2"
-tokenizer = GPT2Tokenizer.from_pretrained(model_name)
-model = GPT2LMHeadModel.from_pretrained(model_name)
+# Initialize Hugging Face InferenceClient (Cerebras provider)
+client = InferenceClient(
+    provider="cerebras",
+    api_key="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"  # set in Render environment variables
+)
 
-# Define conversation history
+# Predefined conversation history
 conversations: List[Tuple[str, str]] = [
     ("Hi there!", "Hello! How can I help you today?"),
     ("Do you believe in God?", "As an AI, I don't have personal beliefs. This is a complex topic with many perspectives."),
@@ -30,7 +31,7 @@ conversations: List[Tuple[str, str]] = [
     ("What are your goals in life?", "As an AI, I don't have personal goals, but I'm designed to assist users in achieving their goals and finding information.")
 ]
 
-# Define input and output models
+# API models
 chat_input = api.model('ChatInput', {
     'message': fields.String(required=True, description='User input message')
 })
@@ -45,31 +46,21 @@ feedback_input = api.model('FeedbackInput', {
 })
 
 def get_response(user_input: str) -> str:
-    # Check if the input matches any predefined conversations
+    # First check predefined answers
     for pattern, response in conversations:
         if user_input.lower() in pattern.lower():
             return response
 
-    # If no match found, use GPT-2 to generate a response
-    input_ids = tokenizer.encode(user_input, return_tensors='pt')
-    attention_mask = torch.ones(input_ids.shape, dtype=torch.long)
-    pad_token_id = tokenizer.eos_token_id
-
-    output = model.generate(
-        input_ids,
-        attention_mask=attention_mask,
-        max_length=100,
-        num_return_sequences=1,
-        no_repeat_ngram_size=2,
-        do_sample=True,
-        top_k=50,
-        top_p=0.95,
-        temperature=0.7,
-        pad_token_id=pad_token_id
-    )
-
-    response = tokenizer.decode(output[0], skip_special_tokens=True)
-    return response
+    # Otherwise query Hugging Face model (Cerebras GPT-OSS 120B)
+    try:
+        completion = client.chat.completions.create(
+            model="openai/gpt-oss-120b",
+            messages=[{"role": "user", "content": user_input}],
+            max_tokens=300
+        )
+        return completion.choices[0].message["content"]
+    except Exception as e:
+        return f"Error: {str(e)}"
 
 @ns.route('/chat')
 class Chat(Resource):
