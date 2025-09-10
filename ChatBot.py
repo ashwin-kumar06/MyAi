@@ -15,7 +15,7 @@ ns = api.namespace('chatbot', description='Chatbot operations')
 # Initialize Hugging Face InferenceClient (Cerebras provider)
 client = InferenceClient(
     provider="cerebras",
-    api_key="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"  # set in Render environment variables
+    api_key="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"  # set in Render environment variables
 )
 
 # Predefined conversation history
