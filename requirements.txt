@@ -1,8 +1,6 @@
-Flask
-flask-restx
-nltk
-scikit-learn
-flask-cors
-torch
-transformers
-Gunicorn
+Flask==3.0.3
+flask-restx==1.3.0
+flask-cors==4.0.1
+huggingface_hub==0.24.6
+python-dotenv==1.0.1
+gunicorn==21.2.0
