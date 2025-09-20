@@ -10,12 +10,13 @@ load_dotenv()
 app = Flask(__name__)
 CORS(app)
 api = Api(app, version='1.0', title='Enhanced Chatbot API',
-    description='An advanced chatbot API using Hugging Face InferenceClient with feedback mechanism')
+    description='An advanced chatbot API using Hugging Face InferenceClient (Cerebras) with feedback mechanism')
 
 ns = api.namespace('chatbot', description='Chatbot operations')
 
-# Initialize Hugging Face InferenceClient
+# Initialize Hugging Face InferenceClient (Cerebras provider)
 client = InferenceClient(
+    provider="cerebras",
     api_key=os.getenv("HF_TOKEN")  # set in Render environment variables
 )
 
@@ -52,14 +53,14 @@ def get_response(user_input: str) -> str:
         if user_input.lower() in pattern.lower():
             return response
 
-    # Otherwise query Hugging Face model
+    # Otherwise query Hugging Face model (Cerebras GPT-OSS 120B)
     try:
-        response = client.chat_completion(
-            model="microsoft/DialoGPT-medium",
+        completion = client.chat.completions.create(
+            model="openai/gpt-oss-120b",
             messages=[{"role": "user", "content": user_input}],
             max_tokens=300
         )
-        return response.choices[0].message.content
+        return completion.choices[0].message["content"]
     except Exception as e:
         return f"Error: {str(e)}"
 
