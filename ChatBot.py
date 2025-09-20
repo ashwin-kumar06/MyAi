@@ -4,6 +4,8 @@ from flask_cors import CORS
 from huggingface_hub import InferenceClient
 import os
 from typing import List, Tuple
+from dotenv import load_dotenv
+load_dotenv()
 
 app = Flask(__name__)
 CORS(app)
@@ -15,7 +17,7 @@ ns = api.namespace('chatbot', description='Chatbot operations')
 # Initialize Hugging Face InferenceClient (Cerebras provider)
 client = InferenceClient(
     provider="cerebras",
-    api_key="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"  # set in Render environment variables
+    api_key=os.getenv("HF_TOKEN")  # set in Render environment variables
 )
 
 # Predefined conversation history
