@@ -47,6 +47,48 @@ conversations: List[Tuple[str, str]] = [
      "Ashwin sees tech as a tool for impact — not just fancy features, but solutions that help people in daily life."),
 ]
 
+# -------- Conversation matching utilities --------
+def _normalize_text(text: str) -> str:
+    return " ".join(text.lower().strip().split())
+
+def _tokenize(text: str) -> set:
+    return set(_normalize_text(text).split())
+
+def _jaccard_similarity(a: str, b: str) -> float:
+    set_a = _tokenize(a)
+    set_b = _tokenize(b)
+    if not set_a and not set_b:
+        return 1.0
+    if not set_a or not set_b:
+        return 0.0
+    intersection = set_a.intersection(set_b)
+    union = set_a.union(set_b)
+    return len(intersection) / max(1, len(union))
+
+def _find_best_conversation_match(user_input: str) -> Tuple[str, float] | Tuple[None, float]:
+    best_response = None
+    best_score = 0.0
+    normalized_user = _normalize_text(user_input)
+
+    for pattern, response in conversations:
+        normalized_pattern = _normalize_text(pattern)
+
+        # Exact match
+        if normalized_user == normalized_pattern:
+            return response, 1.0
+
+        # Substring containment (either direction) gets a strong score
+        if normalized_user in normalized_pattern or normalized_pattern in normalized_user:
+            score = 0.85
+        else:
+            score = _jaccard_similarity(normalized_user, normalized_pattern)
+
+        if score > best_score:
+            best_score = score
+            best_response = response
+
+    return (best_response, best_score) if best_response is not None else (None, 0.0)
+
 # API models
 chat_input = api.model('ChatInput', {
     'message': fields.String(required=True, description='User input message')
@@ -62,16 +104,35 @@ feedback_input = api.model('FeedbackInput', {
 })
 
 def get_response(user_input: str) -> str:
-    # First check predefined answers
-    for pattern, response in conversations:
-        if user_input.lower() in pattern.lower():
-            return response
+    # Always check stored conversations first using fuzzy matching
+    matched_response, score = _find_best_conversation_match(user_input)
+    if matched_response is not None and score >= 0.45:
+        return matched_response
 
-    # Otherwise query Hugging Face model (Cerebras GPT-OSS 120B)
+    # Otherwise query the model, but include the stored conversations as few-shot guidance
     try:
+        example_messages: List[dict] = []
+        # Limit examples to avoid overly long prompts
+        max_pairs = 20
+        for i, (q, a) in enumerate(conversations[:max_pairs]):
+            example_messages.append({"role": "user", "content": q})
+            example_messages.append({"role": "assistant", "content": a})
+
+        system_instruction = (
+            "You are Ashwin’s assistant. First, try to answer using the provided prior "
+            "Q&A examples verbatim if they match the user's question. If none match, "
+            "answer concisely and helpfully, staying consistent with those examples."
+        )
+
+        messages = (
+            [{"role": "system", "content": system_instruction}] +
+            example_messages +
+            [{"role": "user", "content": user_input}]
+        )
+
         completion = client.chat.completions.create(
             model="openai/gpt-oss-120b",
-            messages=[{"role": "user", "content": user_input}],
+            messages=messages,
             max_tokens=300
         )
         return completion.choices[0].message["content"]
